@@ -2,8 +2,9 @@ import tkinter as tk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 import functools, sys
 
-global task_names
+global task_names, task_ids
 task_names = {}
+task_ids = ['task' + str(x) for x in range(100)]
 
 class Task():
     def __init__(self, root, menu, todo, matrix):
@@ -11,10 +12,8 @@ class Task():
         self.urgency = tk.IntVar(value=len(task_names))
         self.importance = tk.IntVar(value=len(task_names))
 
-        #placement = categorize(self.urgency, self.importance)
         self.unitU = tk.Frame(todo)
         self.unitI = tk.Frame(todo)
-        self.unitM = tk.Frame()
         self.unitU.grid(row=self.urgency.get()+1, column=1)
         self.unitI.grid(row=self.importance.get()+1, column=2)
         self.itemU = tk.Entry(self.unitU, textvariable=self.name)
@@ -34,12 +33,26 @@ class Task():
         self.increaseI.grid(row=2, column=1)
         self.decreaseI.grid(row=2, column=2)
         self.deleteI.grid(row=2, column=3)
+
+        category, rownum, colnum = self.categorize(self.urgency, self.importance)
+        self.unitM = tk.Frame(matrix, width=100, height=50)
+        self.itemM = tk.Entry(self.unitM, textvariable=self.name)
+        self.unitM.grid(row=rownum, column=colnum)
+
         # debugging code below:
         print(self.name.get()+' initialized with', 'urgency '+str(self.urgency.get()), 'and importance '+str(self.importance.get()))
         print(task_names)
 
     def categorize(self, urgency, importance):
-        pass
+        global task_names
+        category = 1
+        rownum = 1
+        colnum = 1
+        if len(task_names) % 4 == 1:
+            category = 'leisure'
+            rownum = 1
+            colnum = 1
+        return category, rownum, colnum
 
     def increase_urgency(self, unitU, urgency):
         if urgency.get() != 0:
@@ -64,7 +77,7 @@ class Task():
                     task_names[x].unitI.grid(row=task_names[x].importance.get()+1, column=2)
                     unitI.grid(row=importance.get()+1, column=2)
                     break
-        # for debugging: 
+        # for debugging:
         print()
         for x in task_names.keys():
             print(task_names[x].name.get(), ' importance: ', task_names[x].importance.get(), sep='')
@@ -102,19 +115,50 @@ class Task():
             print(task_names[x].name.get(), ' importance: ', task_names[x].importance.get(), sep='')
 
     def delete_task(self, unitU, unitI, item):
+        global task_names, task_ids
         unitU.grid_forget()
         unitI.grid_forget()
         for x in task_names.keys():
             if task_names[x] == self:
+                task_ids.insert(0, x)
                 del task_names[x]
                 break
+        self.reconfigure()
+        del self
+        # debugging information:
         print('\nDELETING...')
         print('tasks:', task_names)
-        # need code to rearrange items in grids...
-        del self
+        print('\nReconfiguring...\n')
         
     def reconfigure(self):
-        pass
+        global task_names
+        urgency_slots = []
+        urgency_slots1 = []
+        importance_slots = []
+        importance_slots1 = []
+        for x in task_names.keys():
+            urgency_slots.append(task_names[x].urgency)
+            importance_slots.append(task_names[x].importance)
+        
+        for x in importance_slots:
+            importance_slots1.append(x.get())
+        importance_slots1.sort()
+        for x in range(len(importance_slots1)-1):
+            if importance_slots1[x] == importance_slots1[x+1] - 2:
+                importance_slots1[x+1] -= 1
+        print('importance_slots:\n', importance_slots1)
+
+        for x in urgency_slots:
+            urgency_slots1.append(x.get())
+        urgency_slots1.sort()
+        for x in range(len(urgency_slots1)-1):
+            if urgency_slots1[x] == urgency_slots1[x+1] -2:
+                urgency_slots1[x+1] -= 1
+        print('urgency_slots:\n', urgency_slots1)
+
+        for x in task_names.keys():
+            task_names[x].unitU.grid(row=task_names[x].urgency.get()+1, column=1)
+            task_names[x].unitI.grid(row=task_names[x].importance.get()+1, column=2)
 
 
 class Gui():
@@ -125,10 +169,8 @@ class Gui():
         heightR = str(int(self.root.winfo_screenheight()))
         self.root.geometry(widthR + 'x' + heightR)
 
-        self.task_ids = ['task' + str(x) for x in range(100)]
-
         self.menu = tk.Frame(self.root)
-        self.new_task = tk.Button(self.menu, text='New Task', command=functools.partial(self.make_task, self.task_ids))
+        self.new_task = tk.Button(self.menu, text='New Task', command=self.make_task)
         self.new_task.pack(side='left')
         self.saveAs = tk.Button(self.menu, text='Save As', command=asksaveasfilename)
         self.saveAs.pack(side='left')
@@ -142,26 +184,34 @@ class Gui():
         self.help.pack(side='left')
         self.quit = tk.Button(self.menu, text='Quit', command=self.root.destroy)
         self.quit.pack(side='left')
-        self.menu.pack(side='top') # grid? something else?
+        self.menu.grid(row=1, column=1, columnspan=2)
         
         self.todo = tk.Frame(self.root)
-        self.todo.pack(side='left', expand='False') # grid? something else?
+        tk.Label(self.todo, text='Urgency').grid(row=0, column=1)
+        tk.Label(self.todo, text='Importance').grid(row=0, column=2)
+        self.todo.grid(row=2, column=1)
         
         self.matrix = tk.Frame(self.root)
-        self.fires = tk.Frame(self.matrix, background='red', width=400, height=300)
-        self.annoyances = tk.Frame(self.matrix, background='orange', width=400, height=300)
-        self.value_creators = tk.Frame(self.matrix, background='green', width=400, height=300)
-        self.leisures = tk.Frame(self.matrix, background='blue', width=400, height=300)
-        self.fires.grid(row=1, column=1)
-        self.annoyances.grid(row=2, column=1)
-        self.value_creators.grid(row=1, column=2)
-        self.leisures.grid(row=2, column=2)
-        self.matrix.pack(side='right', expand='True', fill='both') # grid? something else?
+        tk.Label(self.matrix, text='<----Increasing Urgency----<').grid(row=0, column=0, columnspan=3)
+        tk.Label(self.matrix, text='^\n^\n^\n^\n^\n\n\nI\nn\nc\nr\ne\na\ns\ni\nn\ng\n \nI\nm\np\no\nr\nt\na\nn\nc\ne\n\n\n^\n^\n^\n^\n^').grid(row=1, column=0, rowspan=2)
+        self.fire = tk.Frame(self.matrix, background='red', width=400, height=300)
+        self.annoyance = tk.Frame(self.matrix, background='orange', width=400, height=300)
+        self.value_creator = tk.Frame(self.matrix, background='green', width=400, height=300)
+        self.leisure = tk.Frame(self.matrix, background='blue', width=400, height=300)
+        self.fire.grid(row=1, column=1)
+        self.annoyance.grid(row=2, column=1)
+        self.value_creator.grid(row=1, column=2)
+        self.leisure.grid(row=2, column=2)
+        self.matrix.grid(row=2, column=2)
+        """
+        self.transparent = tk.PhotoImage(file='Transparent.png')
+        self.topmatrix = tk.Canvas(self.root, )
+        self.topmatrix.grid(row=2, column=2)
+        """
+        self.make_task()
 
-        self.make_task(self.task_ids)
-
-    def make_task(self, task_ids):
-        global task_names
+    def make_task(self):
+        global task_names, task_ids
         task_names[task_ids.pop(0)] = Task(self.root, self.menu, self.todo, self.matrix)
 
     def save_tasks(self):
